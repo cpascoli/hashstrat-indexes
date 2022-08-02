@@ -12,12 +12,18 @@ Users can withdraw their funds by returning their Index LP tokens.
 
 HashStrat Indexes allow to easily invest into a combination of strategies and assets held withing multiple HashStrat Pools and achieve smoother risk and return profiles.
 
+## Install Dependencies
 
+```shell
+brew install node                # Install Node (MacOS with Homebrew)
+npm install --save-dev hardhat   # Install HardHat
+npm install                      # Install dependencies
+
+```
 
 ##  Run Tests
 ```shell
 npx hardhat test
-npx hardhat run scripts/deploy-polygon.ts
 ```
 
 ##  Deployment 
