@@ -16,19 +16,13 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: RPC_URL_POLYGON_MAIN || "",
-        blockNumber:  31406816 // 31273523 // 31272237 //31237775,
+        blockNumber: 31481928
       }
     },
     kovan: {
       url: RPC_URL_KOVAN,
       accounts: { mnemonic: MNEMONIC  },
     },
-    // kovanfork: {
-    //   forking: {
-    //     url: RPC_URL_KOVAN || "",
-    //     blockNumber: 33068883
-    //   }
-    // },
     polygon: {
       url: RPC_URL_POLYGON_MAIN,
       accounts: { mnemonic: MNEMONIC  },

@@ -4,12 +4,13 @@
 // It will be used by the Solidity compiler to validate its version.
 pragma solidity ^0.8.14;
 
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./IPoolV2.sol";
 import "./MultiPoolLPToken.sol";
+// import "hardhat/console.sol";
+
 
 contract MultiPool is Ownable {
 
@@ -60,7 +61,6 @@ contract MultiPool is Ownable {
 
         pools.push(pool);
         totalWeights += pool.weight;
-        console.log("Pool %s added, %s pools, totalWeights: %s", name, pools.length, totalWeights);
     }
 
 
@@ -79,8 +79,8 @@ contract MultiPool is Ownable {
         // move deposit tokens in the MultiPool
         depositToken.transferFrom(msg.sender, address(this), amount);
 
-        // calculate lptokens for this deposit based on the value of all the pools of this MultiPool
-        uint lpToMint = lpTokensForDeposit(amount);
+        // the value in the pools before this deposit
+        uint valueBefore = totalPoolsValue();
 
         // allocate the deposit to the pools
         uint remainingAmount = amount;
@@ -91,55 +91,57 @@ contract MultiPool is Ownable {
             remainingAmount -= allocation;
 
             uint lpReceived = allocateToPool(pool, allocation);
-            // console.log("Deposited %s into pool %s and received %s LP", allocation, pool.name, lpReceived);
             require(lpReceived > 0, "LP amount received should be > 0");
         }
+
+        // the value in the pools after this deposit
+        uint valueAfter = totalPoolsValue();
+
+        // calculate lptokens for this deposit based on the value added to the pools
+        uint lpToMint = lpTokensForDeposit(valueAfter - valueBefore);
       
         // mint lp tokens to the user
-        // console.log("Minting %s LP to user ", lpToMint);
         lpToken.mint(msg.sender, lpToMint);
 
         emit Deposited(msg.sender, amount);
     }
 
 
-   function withdrawLP(uint256 amount) external {
+   function withdrawLP(uint256 lpAmount) external {
+        uint amount = lpAmount == 0 ? lpToken.balanceOf(msg.sender) : lpAmount;
 
         require(amount > 0, "Withdrawal amount is 0");
         require(lpToken.totalSupply() > 0, "No LP tokens minted");
         require(amount <= lpToken.balanceOf(msg.sender), "LP balance exceeded");
   
         // calculate percentage of LP being withdrawn
-        bool isWithdrawingAll = amount == lpToken.totalSupply();
         uint precision = 10 ** uint(lpToken.decimals());
         uint withdrawnPerc = precision * amount / lpToken.totalSupply();
         
         // then burn the LP for this withdrawal
         lpToken.burn(msg.sender, amount);
 
+        bool isWithdrawingAll = amount == lpToken.totalSupply();
+        uint depositTokenBalanceBefore = depositToken.balanceOf(address(this));
         // for each pool withdraw the % of LP
         for (uint i=0; i<pools.length; i++) {
             PoolInfo memory pool = pools[i];
             uint multipoolBalance = IERC20(pool.lpTokenAddress).balanceOf(address(this));
             uint withdrawAmount = isWithdrawingAll ? multipoolBalance : withdrawnPerc * multipoolBalance / precision;
-
-            console.log("Withdrawing %s LP from Pool %s", withdrawAmount, pool.name);
             IPoolV2(pool.poolAddress).withdrawLP(withdrawAmount);
         }
 
-        // transfer deposit tokens to user
-        uint depositTokenBalanceBefore = depositToken.balanceOf(address(this));
-        uint depositTokenBalanceAfter = depositToken.balanceOf(address(this));
-        uint total = depositTokenBalanceAfter - depositTokenBalanceBefore;
-        console.log("Withdrawn total: %s %s", total, depositToken.name());
+        uint amountWithdrawn = depositToken.balanceOf(address(this)) - depositTokenBalanceBefore;
+        require (amountWithdrawn > 0, "Amount withdrawn is 0");
 
-        // remember addresses that withdrew tokens
-        withdrawals[msg.sender] += total;
-        totalWithdrawn += total;
+        // remember tokens withdrawn
+        withdrawals[msg.sender] += amountWithdrawn;
+        totalWithdrawn += amountWithdrawn;
 
-        depositToken.transfer(msg.sender, total);
+        // transfer the amount of depoist tokens withdrawn to the user
+        depositToken.transfer(msg.sender, amountWithdrawn);
 
-        emit Withdrawn(msg.sender, amount);
+        emit Withdrawn(msg.sender, amountWithdrawn);
    }
 
 
@@ -165,12 +167,9 @@ contract MultiPool is Ownable {
         } else {
             ///// if already have allocated LP tokens => calculate the additional LP tokens for this deposit
 
-            // calculate portfolio % of the deposit (using lpPrecision digits precision)
-            uint poolsValue = totalPoolsValue();
-            require(poolsValue > 0, "Pools value is 0");
-
-            uint lpPrecision = 10 ** uint(lpToken.decimals());
-            uint depositPercentage = lpPrecision * amount / poolsValue;
+            // calculate portfolio % of the deposit (using 'precision' digits)
+            uint precision = 10 ** uint(lpToken.decimals());
+            uint depositPercentage = precision * amount / totalPoolsValue();
 
             // calculate the amount of LP tokens for the deposit so that they represent 
             // a % of the existing LP tokens equivalent to the % value of this deposit to the sum of all pools value.
@@ -180,7 +179,7 @@ contract MultiPool is Ownable {
             //      P: Percentage of pools value accounted by this deposit
             //      T: total LP tokens allocated before this deposit
     
-            depositLPTokens = (depositPercentage * lpToken.totalSupply()) / ((1 * lpPrecision) - depositPercentage);
+            depositLPTokens = (depositPercentage * lpToken.totalSupply()) / ((1 * precision) - depositPercentage);
         }
 
         return depositLPTokens;

@@ -32,13 +32,11 @@ describe("MultiPool contract", function () {
     // add minter
     await multiPoolLPToken.addMinter(multiPool.address)
 
-    const usdc = await ethers.getContractAt('Token', usdcAddress);
+    const usdc = new Contract(usdcAddress, abis["erc20"], ethers.provider)
 
-    // get token contracts
-    const abi = abis["poolV2"]
-    const pool1 = new Contract(pools.pool01.address, abi, ethers.provider)
-    const pool2 = new Contract(pools.pool02.address, abi, ethers.provider)
-    const pool3 = new Contract(pools.pool03.address, abi, ethers.provider)
+    const pool1 = new Contract(pools.pool01.address, abis["poolV2"], ethers.provider)
+    const pool2 = new Contract(pools.pool02.address, abis["poolV2"], ethers.provider)
+    const pool3 = new Contract(pools.pool03.address, abis["poolV2"], ethers.provider)
 
     await setupPool(pool1)
     await setupPool(pool2)
@@ -65,11 +63,8 @@ describe("MultiPool contract", function () {
     it("Should allocate LP tokens to the user and the MutliPool", async function () {
       const { multiPool, multiPoolLPToken, owner, usdc } = await loadFixture(deployTokenFixture);
 
-      // get token contracts
-      const abi = abis["poolV2"]  
-      const lptoken = await ethers.getContractAt('Token', pools.pool02.lptoken);
-
-      const pool2 = new Contract(pools.pool02.address, abi, ethers.provider)
+      const lptoken = new Contract(pools.pool02.lptoken, abis["erc20"], ethers.provider)
+      const pool2 = new Contract(pools.pool02.address, abis["poolV2"] , ethers.provider)
       await setupPool(pool2)
 
       // add pool2 (no deposits)
@@ -79,33 +74,114 @@ describe("MultiPool contract", function () {
       await transferFunds(1_000 * 10 ** 6, owner.address)
 
       const depositAmount = 1_000 * 10 ** 6
-      await usdc.approve(multiPool.address, depositAmount)
+      await usdc.connect(owner).approve(multiPool.address, depositAmount)
 
       // deposit funds
       await multiPool.deposit(depositAmount);
 
-      expect( fromUsdc(await usdc.balanceOf(owner.address)) ).to.equal("0.0");
+      const totalPoolsValue = await multiPool.totalPoolsValue();
 
-      expect( fromUsdc(await lptoken.balanceOf(multiPool.address)) ).to.equal("1000.0");
+      expect( fromUsdc(await usdc.balanceOf(owner.address)) ).to.equal(0);
 
-      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address)) ).to.equal("1000.0");
+      expect( fromUsdc(await lptoken.balanceOf(multiPool.address)) ).to.equal(1000);
 
-      expect( fromUsdc(await multiPoolLPToken.totalSupply()) ).to.equal("1000.0");
+      expect( await multiPoolLPToken.balanceOf(owner.address) ).to.equal(totalPoolsValue);
+
+      expect( await multiPoolLPToken.totalSupply() ).to.equal(totalPoolsValue);
 
     });
 
   })
 
 
-  describe("Deposit $1000 into Pool01, Pool02, Pool03", function () {
+  describe("Deposit into a non empty Pool", function () {
+
+    it("Should allocate the expected LP tokens when the deposit amount is less than the value in the pool", async function () {
+      const { multiPool, multiPoolLPToken, addr1, addr2, usdc } = await loadFixture(deployTokenFixture);
+
+      const lptoken = new Contract(pools.pool02.lptoken, abis["erc20"], ethers.provider)
+      const pool2 = new Contract(pools.pool02.address, abis["poolV2"] , ethers.provider)
+
+      await setupPool(pool2)
+
+      // add pool2 (no deposits)
+      await multiPool.addPool("Pool02", pools.pool02.address, pools.pool02.lptoken, 100)
+
+      // transfer usdcs to owner
+      await transferFunds(3_000 * 10 ** 6, addr1.address)
+      await transferFunds(1_000 * 10 ** 6, addr2.address)
+
+       // addr1 deposit funds
+      const depositAmount1 = 3_000 * 10 ** 6
+      await usdc.connect(addr1).connect(addr1).approve(multiPool.address, depositAmount1)
+      await multiPool.connect(addr1).deposit(depositAmount1);
+
+      // addr2 deposit funds
+      const depositAmount2 = 1_000 * 10 ** 6
+      await usdc.connect(addr2).approve(multiPool.address, depositAmount2)
+      await multiPool.connect(addr2).deposit(depositAmount2);
+
+      const addr1Balance = await multiPoolLPToken.balanceOf(addr1.address)
+      const addr2Balance = await multiPoolLPToken.balanceOf(addr2.address)
+
+      expect( fromUsdc(await usdc.balanceOf(addr2.address)) ).to.equal(0);
+      expect( fromUsdc(await lptoken.balanceOf(multiPool.address)) ).to.greaterThan(3990);
+      expect( addr1Balance.div(addr2Balance) ).to.equal( 3 );
+      expect( addr1Balance ).to.greaterThan(2993);
+      expect( addr2Balance ).to.greaterThan(997);
+      expect( await multiPoolLPToken.totalSupply() ).to.equal( addr1Balance.add(addr2Balance) );
+
+    });
+
+    it("Should allocate the expected LP tokens when the deposit amount is more than the value in the pool", async function () {
+      const { multiPool, multiPoolLPToken, addr1, addr2, usdc } = await loadFixture(deployTokenFixture);
+
+      const lptoken = new Contract(pools.pool02.lptoken, abis["erc20"], ethers.provider)
+      const pool2 = new Contract(pools.pool02.address, abis["poolV2"] , ethers.provider)
+      await setupPool(pool2)
+
+      // add pool2 (no deposits)
+      await multiPool.addPool("Pool02", pools.pool02.address, pools.pool02.lptoken, 100)
+
+      // transfer usdcs to owner
+      await transferFunds(1_000 * 10 ** 6, addr1.address)
+      await transferFunds(3_000 * 10 ** 6, addr2.address)
+
+       // addr1 deposit funds
+      const depositAmount1 = 1_000 * 10 ** 6
+      await usdc.connect(addr1).approve(multiPool.address, depositAmount1)
+      await multiPool.connect(addr1).deposit(depositAmount1);
+
+      // addr2 deposit funds
+      const depositAmount2 = 3_000 * 10 ** 6
+      await usdc.connect(addr2).approve(multiPool.address, depositAmount2)
+      await multiPool.connect(addr2).deposit(depositAmount2);
+
+      const addr1Balance = await multiPoolLPToken.balanceOf(addr1.address)
+      const addr2Balance = await multiPoolLPToken.balanceOf(addr2.address)
+
+      expect( fromUsdc(await usdc.balanceOf(addr2.address)) ).to.equal(0);
+      expect( fromUsdc(await lptoken.balanceOf(multiPool.address)) ).to.greaterThan(3990);
+      expect( Math.round( addr2Balance.mul(100).div(addr1Balance).toNumber() / 100 ) ).to.equal( 3 );
+      expect( addr1Balance ).to.greaterThan( 997 );
+      expect( addr2Balance ).to.greaterThan( 2993 );
+      expect( await multiPoolLPToken.totalSupply() ).to.equal( addr1Balance.add(addr2Balance) );
+
+    });
+
+
+  })
+
+
+
+  describe("Deposit into a MultiPool of Pool01, Pool02, Pool03", function () {
 
     it("Should deposit into the pools proportionally to the pool weights", async function () {
       const { multiPool, multiPoolLPToken, owner, usdc, pool1, pool2, pool3 } = await loadFixture(deployTokenFixture);
 
-
-      const lptoken01 = await ethers.getContractAt('Token', pools.pool01.lptoken);
-      const lptoken02 = await ethers.getContractAt('Token', pools.pool02.lptoken);
-      const lptoken03 = await ethers.getContractAt('Token', pools.pool03.lptoken);
+      const lptoken01 = new Contract(pools.pool01.lptoken, abis["erc20"], ethers.provider)
+      const lptoken02 = new Contract(pools.pool02.lptoken, abis["erc20"], ethers.provider)
+      const lptoken03 = new Contract(pools.pool03.lptoken, abis["erc20"], ethers.provider)
 
       // add pools with 20% / 30% / 50% weights
       await multiPool.addPool("Pool01", pools.pool01.address, pools.pool01.lptoken, 20)
@@ -116,15 +192,15 @@ describe("MultiPool contract", function () {
       console.log("pool2 totalPortfolioValue: ", fromUsdc(await pool2.totalPortfolioValue()) )
       console.log("pool3 totalPortfolioValue: ", fromUsdc(await pool3.totalPortfolioValue()) )
 
-      // // transfer usdcs to owner
+      // transfer usdcs to owner
       await transferFunds(1_000 * 10 ** 6, owner.address)
 
       const depositAmount = 1_000 * 10 ** 6
-      await usdc.approve(multiPool.address, depositAmount)
+      await usdc.connect(owner).approve(multiPool.address, depositAmount)
 
-      const lp1a = Number( fromUsdc( await lptoken01.totalSupply() ))
-      const lp2a = Number( fromUsdc( await lptoken02.totalSupply() ))
-      const lp3a = Number( fromUsdc( await lptoken03.totalSupply() ))
+      const lp1a = fromUsdc( await lptoken01.totalSupply() )
+      const lp2a = fromUsdc( await lptoken02.totalSupply() )
+      const lp3a = fromUsdc( await lptoken03.totalSupply() )
 
       //  deposit funds intp Pool01, Pool02, Pool03 according to the MultiPool weights
       await multiPool.deposit(depositAmount);
@@ -133,16 +209,16 @@ describe("MultiPool contract", function () {
       const bal02 = await pool2.totalPortfolioValue()
       const bal03 = await pool3.totalPortfolioValue()
 
-      const lp1 = Number( fromUsdc( await lptoken01.totalSupply() ))
-      const lp2 = Number( fromUsdc( await lptoken02.totalSupply() ))
-      const lp3 = Number( fromUsdc( await lptoken03.totalSupply() ))
+      const lp1 = fromUsdc( await lptoken01.totalSupply() )
+      const lp2 = fromUsdc( await lptoken02.totalSupply() )
+      const lp3 = fromUsdc( await lptoken03.totalSupply() )
 
       expect( round( bal01 / 10 ** 6 , 0) ).to.equal( 200 )
       expect( round( bal02 / 10 ** 6 , 0) ).to.equal( 300 -1)
       expect( round( bal03 / 10 ** 6 , 0) ).to.equal( 500 )
  
       // verify that the user go the expected MultiPool LP tokens
-      expect(  fromUsdc(await multiPoolLPToken.balanceOf(owner.address))  ).to.equal("1000.0");
+      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address)) ).to.greaterThan(998);
 
       // verify that the % of new LP tokens issued by Pool01, Pool02, Pool03  
       // matches the % of the new capital deposited into the pools
@@ -163,7 +239,6 @@ describe("MultiPool contract", function () {
       // get token contracts
       const abi = abis["poolV2"]
       const pool = new Contract(pools.pool02.address, abi, ethers.provider)
-      const lptoken = await ethers.getContractAt('Token', pools.pool02.lptoken);
 
       const pool2 = new Contract(pools.pool02.address, abi, ethers.provider)
       await setupPool(pool2)
@@ -171,12 +246,11 @@ describe("MultiPool contract", function () {
       // add pool
       multiPool.addPool("Pool02", pools.pool02.address, pools.pool02.lptoken, 100)
 
-
-      // transfer usdcs to owner
+      // transfer usdc to user
       await transferFunds(1_000 * 10 ** 6, owner.address)
 
       const depositAmount = 1_000 * 10 ** 6
-      await usdc.approve(multiPool.address, depositAmount)
+      await usdc.connect(owner).approve(multiPool.address, depositAmount)
 
       // deposit funds
       await multiPool.deposit(depositAmount);
@@ -184,16 +258,15 @@ describe("MultiPool contract", function () {
       // withdrawy 300 LP tokens
       await multiPool.withdrawLP(300 * 10 ** 6);
 
-      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address))  ).to.equal("700.0");
-      expect( fromUsdc(await multiPoolLPToken.totalSupply())  ).to.equal("700.0");
+      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address)) ).to.greaterThan(697);
+      expect( fromUsdc(await multiPoolLPToken.totalSupply()) ).to.greaterThan(697);
 
-
-      // withdrawy the remaining 700 LP tokens
-      await multiPool.withdrawLP(700 * 10 ** 6);
+      // withdrawy the remaining LP tokens
+      await multiPool.withdrawLP(0);
    
-      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address))  ).to.equal("0.0");
-      expect( fromUsdc(await multiPoolLPToken.totalSupply())  ).to.equal("0.0");
-      expect( fromUsdc(await pool.totalPortfolioValue()) ).to.equal( "0.0");
+      expect( fromUsdc(await multiPoolLPToken.balanceOf(owner.address)) ).to.equal(0);
+      expect( fromUsdc(await multiPoolLPToken.totalSupply())  ).to.equal(0);
+      expect( fromUsdc(await pool.totalPortfolioValue()) ).to.equal(0);
 
     });
 
@@ -206,7 +279,7 @@ async function transferFunds(amount: number, recipient: string) {
 
   // 48,354,222.149244   100.000000
   const [owner, addr1, addr2] = await ethers.getSigners();
-  const usdc = await ethers.getContractAt('Token', usdcAddress);
+  const usdc = new Contract(usdcAddress, abis["erc20"], ethers.provider)
 
   // impersonate 'account'
   await network.provider.request({
@@ -219,15 +292,12 @@ async function transferFunds(amount: number, recipient: string) {
 
 async function  setupPool(pool : Contract) {
     const ownerAddress = await pool.owner()
-    console.log("ownerAddress: ", ownerAddress)
-
     await network.provider.request({
         method: "hardhat_impersonateAccount",
         params: [ownerAddress],
     });
 
     const balance = await pool.totalPortfolioValue()
-    console.log("withdrawing ", balance.toString())
     if (balance > 0) {
       const owner = await ethers.getSigner(ownerAddress);
       await pool.connect(owner).withdrawAll()
@@ -237,12 +307,12 @@ async function  setupPool(pool : Contract) {
 
 const pools = {
   pool01: {
-    address: '0x5F7621d43fa646C3e7838266DD12ccCb390Dc933',
-    lptoken: '0xAE013eD73fc72f4361aECed322612A973fd36085',
+    address: '0x7b8b3fc7563689546217cFa1cfCEC2541077170f',
+    lptoken: '0x2EbF538B3E0F556621cc33AB5799b8eF089b2D8C',
   },
   pool02: {
-    address: '0xeA2addD56cef3757ed9e473e5Bb39E5aF00531F0',
-    lptoken: '0x23De455b52537c442c00F8eC5c11fC64d4e9811E',
+    address: '0x62464FfFAe0120E662169922730d4e96b7A59700',
+    lptoken: '0x26b80F5970bC835751e2Aabf4e9Bc5B873713f17',
   },
   pool03: {
     address: '0xc60CE76892138d9E0cE722eB552C5d8DE70375a5',
@@ -250,15 +320,14 @@ const pools = {
   },
   pool04: {
     address: '0x82314313829B7AF502f9D60a4f215F6b6aFbBE4B',
-    lptoken: '0x81f219E6CDb60b12CD07b8457A43630050572122',
+    lptoken: '0xA9085698662029Ef6C21Bbb23a81d3eB55898926',
   },
   pool05: {
-    address: '0xa290591BB6606BB0cE71790eC19b83A311e6CcaE',
-    lptoken: '0x81f219E6CDb60b12CD07b8457A43630050572122',
+    address: '0x742953942d6A3B005e28a451a0D613337D7767b2',
+    lptoken: '0x7EB471C4033dd8c25881e9c02ddCE0C382AE8Adb',
   },
   pool06: {
-    address: '0x574b983b13A42FbA0788e3AE829553913Fdc5879',
-    lptoken: '0xB995C1b6bb43139aE1B2B682DB5B4287667Fcd7F',
+    address: '0x949e118A42D15Aa09d9875AcD22B87BB0E92EB40',
+    lptoken: '0x74243293f6642294d3cc94a9C633Ae943d557Cd3',
   }
-
 }

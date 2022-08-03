@@ -3,21 +3,21 @@ import { ethers } from "hardhat";
 
 // DAI on Kovan
 const daiAddress = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa'
-
+const lpDecimals = 18
 
 async function main() {
 
-  depolyMultiPool("MultiPool1 BTC", [
-    { name: "pool01", weight: 1 },
-    { name: "pool03", weight: 1 },
-    { name: "pool05", weight: 1 },
-  ])
-  
-  // depolyMultiPool("MultiPool2 ETH", [
-  //   { name: "pool02", weight: 1 },
-  //   { name: "pool04", weight: 1 },
-  //   { name: "pool06", weight: 1 },
+  // depolyMultiPool("MultiPool1 BTC", [
+  //   { name: "pool01", weight: 1 },
+  //   { name: "pool03", weight: 1 },
+  //   { name: "pool05", weight: 1 },
   // ])
+  
+  depolyMultiPool("MultiPool2 ETH", [
+    { name: "pool02", weight: 1 },
+    { name: "pool04", weight: 1 },
+    { name: "pool06", weight: 1 },
+  ])
 
   // depolyMultiPool( "MultiPool3 BTC/ETH", [
   //   { name: "pool01", weight: 1 },
@@ -38,7 +38,7 @@ async function depolyMultiPool(name: string, pools : Array<Pool>) {
   const MultiPool = await ethers.getContractFactory("MultiPool");
   const MultiPoolLPToken = await ethers.getContractFactory("MultiPoolLPToken");
 
-  const multiPoolLPToken = await MultiPoolLPToken.deploy("MultiPool LP Token", "MultiPoolLP", 18)
+  const multiPoolLPToken = await MultiPoolLPToken.deploy("MultiPool LP Token", "MultiPoolLP", lpDecimals)
   await multiPoolLPToken.deployed()
   console.log("LPToken deployed at address:", multiPoolLPToken.address);
 

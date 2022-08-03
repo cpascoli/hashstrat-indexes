@@ -23,7 +23,7 @@ export const round = (n : number, d=2) => {
 // }
 
 export const fromUsdc = (v: BigNumber) => {
-    return ethers.utils.formatUnits(v , 'mwei')
+    return Number(ethers.utils.formatUnits(v , 'mwei'))
 }
 
 export const toUsdc = (v: number) => {
