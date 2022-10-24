@@ -7,7 +7,11 @@
     "test": "test"
   },
   "scripts": {
-    "test": "mocha --timeout 400000"
+    "clean": "npx hardhat clean",
+    "chain": "npx hardhat node",
+    "deploy:goerli": "npx hardhat run --network goerli scripts/deploy-goerli.ts",
+    "deploy:polygon": "npx hardhat run --network polygon scripts/deploy-polygon.ts",
+    "test": "npx hardhat test"
   },
   "author": "cpascoli",
   "license": "MIT",

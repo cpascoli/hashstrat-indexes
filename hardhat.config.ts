@@ -7,25 +7,26 @@ import "hardhat-contract-sizer";
 require('dotenv').config()
 
 
-const { RPC_URL_POLYGON_MAIN, RPC_URL_KOVAN, OWNER_PRIVATE_KEY, ETHERSCAN_API_KEY, POLYGONSCAN_API_KEY, MNEMONIC} = process.env;
+const { RPC_URL_POLYGON_MAIN, RPC_URL_ALCHEMY_POLYGON_MAIN, RPC_URL_GOERLI, ETHERSCAN_API_KEY, POLYGONSCAN_API_KEY, MNEMONIC} = process.env;
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.14",
+  solidity: "0.8.15",
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
       forking: {
         url: RPC_URL_POLYGON_MAIN || "",
-        blockNumber: 31481928
+        blockNumber: 34661181 //31481928
       }
     },
-    kovan: {
-      url: RPC_URL_KOVAN,
+    goerli: {
+      url: RPC_URL_GOERLI,
       accounts: { mnemonic: MNEMONIC  },
     },
     polygon: {
       url: RPC_URL_POLYGON_MAIN,
       accounts: { mnemonic: MNEMONIC  },
+      gasPrice:  120000000000,  // 120 Gwei
     },
   },
   etherscan: {

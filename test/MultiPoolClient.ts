@@ -6,6 +6,7 @@ import { fromUsdc, toUsdc, round } from "./helpers"
 
 import abis from "./abis/abis.json";
 
+const poolOwner = '0x4F888d90c31c97efA63f0Db088578BB6F9D1970C'
 const usdcAddress = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
 const usdcSource = '0xe7804c37c13166ff0b37f5ae0bb07a3aebb6e245' // rich account owing 48,354,222.149244  USDC
 
@@ -20,19 +21,26 @@ describe("MultiPool contract", function () {
 
     const usdc = new Contract(usdcAddress, abis["erc20"], ethers.provider)
 
-    const pool1 = new Contract(pools.pool01.address, abis["poolV2"], ethers.provider)
-    const pool2 = new Contract(pools.pool02.address, abis["poolV2"], ethers.provider)
-    const pool3 = new Contract(pools.pool03.address, abis["poolV2"], ethers.provider)
-    const pool4 = new Contract(pools.pool04.address, abis["poolV2"], ethers.provider)
-    const pool5 = new Contract(pools.pool05.address, abis["poolV2"], ethers.provider)
-    const pool6 = new Contract(pools.pool06.address, abis["poolV2"], ethers.provider)
+    const pool1 = new Contract(pools.pool01.address, abis["poolV3"], ethers.provider)
+    const pool2 = new Contract(pools.pool02.address, abis["poolV3"], ethers.provider)
+    const pool3 = new Contract(pools.pool03.address, abis["poolV3"], ethers.provider)
+    const pool4 = new Contract(pools.pool04.address, abis["poolV3"], ethers.provider)
+    const pool5 = new Contract(pools.pool05.address, abis["poolV3"], ethers.provider)
+    const pool6 = new Contract(pools.pool06.address, abis["poolV3"], ethers.provider)
 
-    setupPool(pool1)
-    setupPool(pool2)
-    setupPool(pool3)
-    setupPool(pool4)
-    setupPool(pool5)
-    setupPool(pool5)
+    emptyPool(pool1.address)
+    emptyPool(pool2.address)
+    emptyPool(pool3.address)
+    emptyPool(pool4.address)
+    emptyPool(pool5.address)
+    emptyPool(pool5.address)
+
+    const pool1Lp = new Contract(pools.pool01.lptoken, abis["erc20"], ethers.provider)
+    const pool2Lp = new Contract(pools.pool02.lptoken, abis["erc20"], ethers.provider)
+    const pool3Lp = new Contract(pools.pool03.lptoken, abis["erc20"], ethers.provider)
+    const pool4Lp = new Contract(pools.pool04.lptoken, abis["erc20"], ethers.provider)
+    const pool5Lp = new Contract(pools.pool05.lptoken, abis["erc20"], ethers.provider)
+    const pool6Lp = new Contract(pools.pool06.lptoken, abis["erc20"], ethers.provider)
 
     const multipool1 = new Contract(multipools.multiPool01.pool, abis["multipool"], ethers.provider)
     const multipool2 = new Contract(multipools.multiPool02.pool, abis["multipool"], ethers.provider)
@@ -43,12 +51,36 @@ describe("MultiPool contract", function () {
     const multipoolLp3 = new Contract(multipools.multiPool03.pool_lp, abis["erc20"], ethers.provider)
 
     // Fixtures can return anything you consider useful for your tests
-    return { owner, addr1, addr2, usdc, multipool1, multipool2, multipool3, multipoolLp1, multipoolLp2, multipoolLp3, pool1, pool2, pool3, pool4, pool5, pool6};
+    return { owner, addr1, addr2, usdc, 
+        multipool1, multipool2, multipool3, 
+        multipoolLp1, multipoolLp2, multipoolLp3, 
+        pool1, pool2, pool3, pool4, pool5, pool6,
+        pool1Lp, pool2Lp, pool3Lp, pool4Lp, pool5Lp, pool6Lp
+      };
   }
 
 
   // You can nest describe calls to create subsections.
   describe("MultiPoolClient", function () {
+
+    it("BBBB Should have fees to collect", async function () {
+
+      const { pool1, pool2, pool3, pool4, pool5, pool6,
+              pool1Lp, pool2Lp, pool3Lp, pool4Lp, pool5Lp, pool6Lp  } = await loadFixture(getContracts);
+      
+      const balance1 = await  pool1Lp.balanceOf(pool1.address)
+      const balance2 = await  pool2Lp.balanceOf(pool2.address)
+      const balance3 = await  pool3Lp.balanceOf(pool3.address)
+      const balance4 = await  pool4Lp.balanceOf(pool4.address)
+      const balance5 = await  pool5Lp.balanceOf(pool5.address)
+      const balance6 = await  pool6Lp.balanceOf(pool6.address)
+
+      const total = balance1.add(balance2).add(balance3).add(balance4).add(balance5).add(balance6)
+
+      console.log("total: ", total.toString(), ">>> ", fromUsdc(total.toString()))
+
+    });
+
 
     
     it("Should have the right deposit token address", async function () {
@@ -59,6 +91,27 @@ describe("MultiPool contract", function () {
       expect(await multipool3.depositToken()).to.equal(usdcAddress);
 
     });
+
+
+    it("Should allow a user to deposit into the MutliPool", async function () {
+      const { multipool3, owner, usdc, pool1, pool2, pool3, pool4, pool5, pool6 } = await loadFixture(getContracts);
+
+      // deposit funds
+      const deposit = 20_000 * 10 ** 6
+      await transferFunds(deposit, owner.address)
+      await usdc.connect(owner).approve(multipool3.address, deposit)
+      await multipool3.connect(owner).deposit(deposit);
+
+      console.log("pool1: ", fromUsdc(await pool1.totalPortfolioValue())  )
+      console.log("pool2: ", fromUsdc(await pool2.totalPortfolioValue())  )
+      console.log("pool3: ", fromUsdc(await pool3.totalPortfolioValue())  )
+      console.log("pool4: ", fromUsdc(await pool4.totalPortfolioValue())  )
+      console.log("pool5: ", fromUsdc(await pool5.totalPortfolioValue())  )
+      console.log("pool6: ", fromUsdc(await pool6.totalPortfolioValue())  )
+
+      console.log("total: ", fromUsdc( await multipool3.totalPoolsValue()) )
+
+    }).timeout(300000);
 
 
     it("Should allow a user to deposit into the MutliPool", async function () {
@@ -82,8 +135,6 @@ describe("MultiPool contract", function () {
       expect( Math.floor( fromUsdc(await pool6.totalPortfolioValue())) ).to.equal(166);
 
     }).timeout(300000);
-
-
 
     it("Should allow a user to withdraw from the MutliPool", async function () {
       const { multipool3, multipoolLp3, addr1, addr2, usdc, pool1, pool2, pool3, pool4, pool5, pool6 } = await loadFixture(getContracts);
@@ -125,11 +176,8 @@ describe("MultiPool contract", function () {
 
     }).timeout(300000);
 
+
   });
-
-
-
-
 
 });
 
@@ -170,42 +218,58 @@ const multipools = {
 
 const pools = {
   pool01: {
-    address: '0x7b8b3fc7563689546217cFa1cfCEC2541077170f',
-    lptoken: '0x2EbF538B3E0F556621cc33AB5799b8eF089b2D8C',
+    address: '0x8714336322c091924495B08938E368Ec0d19Cc94',
+    lptoken: '0x49c3ad1bF4BeFb024607059cb851Eb793c224BaB',
   },
   pool02: {
-    address: '0x62464FfFAe0120E662169922730d4e96b7A59700',
-    lptoken: '0x26b80F5970bC835751e2Aabf4e9Bc5B873713f17',
+    address: '0xD963e4C6BE2dA88a1679A40139C5b75961cc2619',
+    lptoken: '0xC27E560E3D1546edeC5DD858D404EbaF2166A763',
   },
   pool03: {
-    address: '0xc60CE76892138d9E0cE722eB552C5d8DE70375a5',
-    lptoken: '0xe62A17b61e4E309c491F1BD26bA7BfE9e463610e',
+    address: '0x63151e56140E09999983CcD8DD05927f9e8be81D',
+    lptoken: '0xCdf8886cEea718ad37e02e9a421Eb674F20e5ba1',
   },
   pool04: {
-    address: '0x82314313829B7AF502f9D60a4f215F6b6aFbBE4B',
-    lptoken: '0xA9085698662029Ef6C21Bbb23a81d3eB55898926',
+    address: '0xd229428346E5Ba2F08AbAf52fE1d2C941ecB36AD',
+    lptoken: '0xe4FF896D756Bdd6aa1208CDf05844335aEA56297',
   },
   pool05: {
-    address: '0x742953942d6A3B005e28a451a0D613337D7767b2',
-    lptoken: '0x7EB471C4033dd8c25881e9c02ddCE0C382AE8Adb',
+    address: '0xCfcF4807d10C564204DD131527Ba8fEb08e2cc9e',
+    lptoken: '0x80bc0b435b7e7F0Dc3E95C3dEA87c68D5Ade4378',
   },
   pool06: {
-    address: '0x949e118A42D15Aa09d9875AcD22B87BB0E92EB40',
-    lptoken: '0x74243293f6642294d3cc94a9C633Ae943d557Cd3',
+    address: '0xa2f3c0FDC55814E70Fdac2296d96bB04840bE132',
+    lptoken: '0x2523c4Ab54f5466A8b8eEBCc57D8edC0601faB54',
   }
 }
 
 
-async function  setupPool(pool : Contract) {
-  const ownerAddress = await pool.owner()
+
+async function emptyPool(poolAddr: string) {
+
+  const pool = new Contract(poolAddr, abis["poolV3"], ethers.provider)
+  const poolLPAddr = await pool.lpToken()
+  const poolLP = new Contract(poolLPAddr, abis["erc20"], ethers.provider)
+
+  // take liquidity from pool
   await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [ownerAddress],
+    method: "hardhat_impersonateAccount",
+    params: [poolOwner],
+  });
+  const signer = await ethers.getSigner(poolOwner);
+
+  const balance = await poolLP.balanceOf(signer.address)
+  if (balance > 0) {
+    await pool.connect(signer).withdrawAll()
+  }
+
+  /// take fees from pool
+  await network.provider.request({
+    method: "hardhat_impersonateAccount",
+    params: [pool.address],
   });
 
-  const balance = await pool.totalPortfolioValue()
-  if (balance > 0) {
-    const owner = await ethers.getSigner(ownerAddress);
-    await pool.connect(owner).withdrawAll()
-  }
+  const pooSigner = await ethers.getSigner(pool.address);
+  await pool.connect(signer).collectFees(0)
+
 }

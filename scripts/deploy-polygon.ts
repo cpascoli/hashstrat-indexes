@@ -7,113 +7,112 @@ const lpDecimals = 6
 
 async function main() {
 
-  // depolyMultiPool("MultiPool1 BTC", [
-  //   { name: "pool01", weight: 1 },
-  //   { name: "pool03", weight: 1 },
-  //   { name: "pool05", weight: 1 },
-  // ])
-  
-  // depolyMultiPool("MultiPool2 ETH", [
-  //   { name: "pool02", weight: 1 },
-  //   { name: "pool04", weight: 1 },
-  //   { name: "pool06", weight: 1 },
-  // ])
+	depolyIndex("Index [BTC]", [
+		{ name: "pool01v3a", weight: 1 },
+		{ name: "pool03v3a", weight: 1 },
+		{ name: "pool05v3a", weight: 1 },
+	])
 
-  depolyMultiPool( "MultiPool3 BTC/ETH", [
-    { name: "pool01", weight: 1 },
-    { name: "pool02", weight: 1 },
-    { name: "pool03", weight: 1 },
-    { name: "pool04", weight: 1 },
-    { name: "pool05", weight: 1 },
-    { name: "pool06", weight: 1 },
-  ])
+	depolyIndex("Index [ETH]", [
+	  { name: "pool02v3a", weight: 1 },
+	  { name: "pool04v3a", weight: 1 },
+	  { name: "pool06v3a", weight: 1 },
+	])
 
+	depolyIndex( "Index [BTC/ETH]", [
+	  { name: "pool01v3a", weight: 1 },
+	  { name: "pool02v3a", weight: 1 },
+	  { name: "pool03v3a", weight: 1 },
+	  { name: "pool04v3a", weight: 1 },
+	  { name: "pool05v3a", weight: 1 },
+	  { name: "pool06v3a", weight: 1 },
+	])
+
+}
+
+
+async function depolyIndex(name: string, pools: Array<Pool>) {
+
+	console.log("Starting deployment of IndexV3: ", name, "on POLYGON")
+
+	const IndexV3 = await ethers.getContractFactory("IndexV3");
+	const IndexLPToken = await ethers.getContractFactory("IndexLPToken");
+
+	const indexLPToken = await IndexLPToken.deploy("IndexLP Token", "IndexLP", lpDecimals)
+	await indexLPToken.deployed()
+	console.log("LPToken deployed at address:", indexLPToken.address);
+
+	const index = await IndexV3.deploy(usdcAddress, indexLPToken.address);
+	await index.deployed();
+	console.log("IndexV3 deployed at address:", index.address);
+
+	// add minter
+	await indexLPToken.addMinter(index.address)
+	console.log("added minter to IndexLP token");
+
+	// add pools
+	for (var pool of pools) {
+		const info = polygonPools[pool.name]
+		const name = pool.name.replace(/^./, pool.name[0].toUpperCase())
+		console.log("adding pool ", name, info.pool, info.pool_lp, pool.weight)
+
+		await index.addPool(name, info.pool, info.pool_lp, pool.weight)
+	}
+
+	console.log("Completed IndexV3 deployment")
 }
 
 
-async function depolyMultiPool(name: string, pools : Array<Pool>) {
-
-  console.log("Starting deployment of MultiPool: ", name, "on POLYGON")
-
-  const MultiPool = await ethers.getContractFactory("MultiPool");
-  const MultiPoolLPToken = await ethers.getContractFactory("MultiPoolLPToken");
-
-  const multiPoolLPToken = await MultiPoolLPToken.deploy("MultiPool LP Token", "MultiPoolLP", lpDecimals)
-  await multiPoolLPToken.deployed()
-  console.log("LPToken deployed at address:", multiPoolLPToken.address);
-
-  const multiPool = await MultiPool.deploy(usdcAddress, multiPoolLPToken.address);
-  await multiPool.deployed();
-  console.log("MultiPool deployed at address:", multiPool.address);
-
-  // add minter
-  await multiPoolLPToken.addMinter(multiPool.address)
-  console.log("added multiPool minter");
-
-  // add pools
-  for (var pool of pools) {
-      const info = polygonPools[pool.name]
-      const name = pool.name.replace(/^./, pool.name[0].toUpperCase())
-      console.log("adding pool ", name, info.pool, info.pool_lp, pool.weight)
-
-      await multiPool.addPool(name, info.pool, info.pool_lp, pool.weight)
-  }
-
-  console.log("Completed MultiPool deployment")
-
-}
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+	console.error(error);
+	process.exitCode = 1;
 });
 
 
 
-
-
 type Pool = {
-  name: keyof typeof polygonPools;
-  weight: number;
+	name: keyof typeof polygonPools;
+	weight: number;
 };
 
 const polygonPools = {
-    "pool01": {
-        "pool": "0x7b8b3fc7563689546217cFa1cfCEC2541077170f",
-        "pool_lp": "0x2EbF538B3E0F556621cc33AB5799b8eF089b2D8C",
-        "strategy": "0x6aa3D1CB02a20cff58B402852FD5e8666f9AD4bd",
-        "price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
-    },
-    "pool02": {
-        "pool": "0x62464FfFAe0120E662169922730d4e96b7A59700",
-        "pool_lp": "0x26b80F5970bC835751e2Aabf4e9Bc5B873713f17",
-        "strategy": "0xca5B24b63D929Ddd5856866BdCec17cf13bDB359",
-        "price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
-    },
-    "pool03": {
-        "pool": "0xc60CE76892138d9E0cE722eB552C5d8DE70375a5",
-        "pool_lp": "0xe62A17b61e4E309c491F1BD26bA7BfE9e463610e",
-        "strategy": "0x46cfDDc7ab8348b44b4a0447F0e5077188c4ff14",
-        "price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
-    },
-    "pool04": {
-        "pool": "0x82314313829B7AF502f9D60a4f215F6b6aFbBE4B",
-        "pool_lp": "0xA9085698662029Ef6C21Bbb23a81d3eB55898926",
-        "strategy": "0x02CF4916Dd9f4bB329AbE5e043569E586fE006E4",
-        "price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
-    },
-    "pool05": {
-        "pool": "0x742953942d6A3B005e28a451a0D613337D7767b2",
-        "pool_lp": "0x7EB471C4033dd8c25881e9c02ddCE0C382AE8Adb",
-        "strategy": "0x7F7a40fa461931f3aecD183f8B56b2782483B04B",
-        "price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
-    },
-    "pool06": {
-        "pool": "0x949e118A42D15Aa09d9875AcD22B87BB0E92EB40",
-        "pool_lp": "0x74243293f6642294d3cc94a9C633Ae943d557Cd3",
-        "strategy": "0x26311040c72f08EF1440B784117eb96EA20A2412",
-        "price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
-    }
+	"pool01v3a": {
+		"pool": "0x8714336322c091924495B08938E368Ec0d19Cc94",
+		"pool_lp": "0x49c3ad1bF4BeFb024607059cb851Eb793c224BaB",
+		"strategy": "0xbfB7A8caF44fD28188673B09aa3B2b00eF301118",
+		"price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
+	},
+	"pool02v3a": {
+		"pool": "0xD963e4C6BE2dA88a1679A40139C5b75961cc2619",
+		"pool_lp": "0xC27E560E3D1546edeC5DD858D404EbaF2166A763",
+		"strategy": "0xc78BD1257b7fE3Eeb33fC824313C71D145C9754b",
+		"price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
+	},
+	"pool03v3a": {
+		"pool": "0x63151e56140E09999983CcD8DD05927f9e8be81D",
+		"pool_lp": "0xCdf8886cEea718ad37e02e9a421Eb674F20e5ba1",
+		"strategy": "0x4687faf8e60ca8e532af3173C0225379939261F7",
+		"price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
+	},
+	"pool04v3a": {
+		"pool": "0xd229428346E5Ba2F08AbAf52fE1d2C941ecB36AD",
+		"pool_lp": "0xe4FF896D756Bdd6aa1208CDf05844335aEA56297",
+		"strategy": "0xB98203780925694BAeAFDC7CB7C6ECb1E6631D17",
+		"price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
+	},
+	"pool05v3a": {
+		"pool": "0xCfcF4807d10C564204DD131527Ba8fEb08e2cc9e",
+		"pool_lp": "0x80bc0b435b7e7F0Dc3E95C3dEA87c68D5Ade4378",
+		"strategy": "0xBbe4786c0D1cEda012B8EC1ad12a2F7a1A5941f1",
+		"price_feed": "0xc907E116054Ad103354f2D350FD2514433D57F6f"
+	},
+	"pool06v3a": {
+		"pool": "0xa2f3c0FDC55814E70Fdac2296d96bB04840bE132",
+		"pool_lp": "0x2523c4Ab54f5466A8b8eEBCc57D8edC0601faB54",
+		"strategy": "0x62386A92078CC4fEF921F9bb1f515464e2f7918f",
+		"price_feed": "0xF9680D99D6C9589e2a93a78A04A279e509205945"
+	}
 }

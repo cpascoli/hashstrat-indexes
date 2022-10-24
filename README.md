@@ -2,8 +2,8 @@
 
 This repo constains the Solidity smart contracts for HashStrat Indexes.
 
-HashStrat Indexes allow to invest on a collection (aka basket) of HashSttap Pools and assocaited strategies.
-Indexes are configured with a set of HashStrat pools and their relative weights. 
+HashStrat Indexes allow to invest on a collection (aka basket) of HashSttap Pools and their assocaited strategies.
+Each Index is configured with a set of HashStrat pools and their relative weights. 
 
 When users deposit funds into an Index, these funds get allocated to the corresponding HashStrat Pools proportionally to the pools' weights within the Index.
 
@@ -28,5 +28,5 @@ npx hardhat test
 
 ##  Deployment 
 ```shell
-npx hardhat run scripts/deploy-polygon.ts
+npx hardhat run --network polygon scripts/deploy-polygon.ts
 ```

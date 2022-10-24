@@ -5,13 +5,13 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./MinterRole.sol";
 
 /**
- * The LP Token of the pool.
- * New tokens get minted by the Pool when users deposit into the pool
- * and get burt when users withdraw from the pool.
- * Only the Pool contract should be able to mint/burn these tokens.
+ * The LP Token of the Index.
+ * New tokens get minted by the Pool when users deposit into the Index
+ * and get burt when users withdraw from the Index.
+ * Only the Index contract should be able to mint/burn these tokens.
  */
 
-contract MultiPoolLPToken is ERC20, MinterRole {
+contract IndexLPToken is ERC20, MinterRole {
 
     uint8 immutable decs;
 
